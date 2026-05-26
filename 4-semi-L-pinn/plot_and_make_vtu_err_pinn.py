@@ -1,0 +1,105 @@
+""" """
+
+from pdb import set_trace as st
+
+import numpy as np
+import vtk
+
+
+import case_settings_pinn
+import utils_exact_solution
+import utils_data_and_folders_pinn
+import utils_mechanics_pinn
+import utils_nn_pinn
+import utils_postprocess_pinn
+
+
+def _load_hol_params():
+    """ """
+    nu = np.loadtxt("./data/nu")
+    G = np.loadtxt("./data/G")
+    nodes_int = np.loadtxt("./data/nodes_int")
+    weights_int = np.loadtxt("./data/weights_int")
+    M = np.loadtxt("./data/M").astype(int)
+    bias_rotation = np.loadtxt("./data/bias_rotation")
+
+    tm_list, _delta_tm = utils_nn_pinn.define_tm(M, bias_rotation)
+    reductions = utils_nn_pinn.define_reductions()
+    tm_full_list = utils_nn_pinn.make_tm_full_list(tm_list, nodes_int)
+
+    idx_seed = 0
+    params_list = utils_data_and_folders_pinn.load_params_list(idx_seed)
+    nn_list = case_settings_pinn.define_nn_forwards_and_derivatives()
+
+    return (
+        nu,
+        G,
+        nodes_int,
+        weights_int,
+        tm_list,
+        tm_full_list,
+        reductions,
+        params_list,
+        nn_list,
+    )
+
+
+# ---------------------------------------------------------------------------
+# add_*_errors functions
+# ---------------------------------------------------------------------------
+
+
+def add_stress_errors(mesh: utils_postprocess_pinn.Mesh) -> utils_postprocess_pinn.Mesh:
+    """ """
+
+    err_abs = np.loadtxt("./results/err_abs_distribution_stress_pinn")
+    err_rel = np.loadtxt("./results/err_rel_distribution_stress_pinn")
+
+    mesh.node_data["err_abs_distribution_stress"] = err_abs
+    mesh.node_data["err_rel_distribution_stress"] = err_rel
+    return mesh
+
+
+def add_displacement_errors(
+    mesh: utils_postprocess_pinn.Mesh,
+) -> utils_postprocess_pinn.Mesh:
+    """ """
+
+    err_abs = np.loadtxt("./results/err_abs_distribution_displ_pinn")
+    err_rel = np.loadtxt("./results/err_rel_distribution_displ_pinn")
+
+    mesh.node_data["err_abs_distribution_displ"] = err_abs
+    mesh.node_data["err_rel_distribution_displ"] = err_rel
+
+    return mesh
+
+
+def add_traction_errors(
+    mesh: utils_postprocess_pinn.Mesh,
+) -> utils_postprocess_pinn.Mesh:
+    """ """
+    err_abs = np.loadtxt("./results/err_abs_distribution_traction_pinn")
+    err_rel = np.loadtxt("./results/err_rel_distribution_traction_pinn")
+
+    mesh.face_data["err_abs_distribution_traction"] = err_abs
+    mesh.face_data["err_rel_distribution_traction"] = err_rel
+
+    return mesh
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+
+    mesh = utils_postprocess_pinn.make_postprocess_domain_plot_boundary_and_inner()
+    mesh = add_stress_errors(mesh)
+    mesh = add_traction_errors(mesh)
+    utils_postprocess_pinn.save_mesh(mesh, "./results/errors_stress_tractions_pinn.vtk")
+
+    mesh = utils_postprocess_pinn.make_postprocess_domain_plot_boundary_and_inner()
+    mesh = add_displacement_errors(mesh)
+    utils_postprocess_pinn.save_mesh(mesh, "./results/errors_displacement_pinn.vtk")
+
+    print("\nDone!")
